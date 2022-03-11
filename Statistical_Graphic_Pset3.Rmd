@@ -1,0 +1,438 @@
+---
+title: "Statistical Graphic Pset3"
+author: 'Group21: Xuan Lian, Jiaxin Yu'
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+library(tidyverse)
+```
+
+# 1 Mortality by state
+
+## a
+
+```{r import_data}
+origin_data_1 = read_tsv('q1_data.txt')
+data_1 = origin_data_1 %>% dplyr::select(-Notes)
+print(slice_head(data_1,n=5L))
+```
+
+## b
+
+```{r 1b}
+dt_1_b = data_1 %>%
+  group_by(`Cause of death Code`) %>%
+  summarise('Number of Deaths' = sum(Deaths)) %>%
+  arrange(desc(`Number of Deaths`)) %>%
+  slice_head(n=8)
+top_eight_code = dt_1_b$`Cause of death Code`
+print(paste0('The eight Cause of death Code values with the highest number of deaths in 2020 are ',  paste(top_eight_code,collapse = ',')))
+```
+
+```{r 1b_2}
+dt_1_b_2 = data_1 %>%
+  filter(`Cause of death Code` %in% top_eight_code) %>%
+  group_by(`Cause of death Code`,`Cause of death`,State) %>%
+  summarise('Number of Deaths' = sum(Deaths), rate = `Number of Deaths`*100000/Population)
+print(dt_1_b_2 %>% filter(State =='New York') %>% arrange(desc(rate)))
+```
+
+
+## c
+
+```{r 1_c}
+library(GGally)
+
+dt_1_c = dt_1_b_2 %>% 
+  pivot_wider(id_cols = State, names_from = `Cause of death Code`, values_from = rate) 
+dt_1_c %>% GGally::ggparcoord(columns = 2:ncol(dt_1_c),alphaLines = .5,splineFactor = 0,scale = 'uniminmax') +
+  theme_bw() +
+  labs(title = 'Static Parallel Coordinates Plot of Cause of death Code',
+       subtitle = ' each line represents a state',
+       x = 'Cause of death Code', y = 'uniminmax scale value')
+data_1 %>% dplyr::select(`Cause of death Code`, `Cause of death`) %>%
+  distinct(`Cause of death Code`, `Cause of death`) %>%
+  filter(`Cause of death Code` %in% top_eight_code) 
+```
+By using `uniminmax` as the scaling method, we get a relatively clear version of static parallel coordinates plot.
+
+From the plot, we can conclude that `G30.9`(Alzheimer disease, unspecified) has strong positive correlation with both `F03`(Unspecified dementia) and `I21.9`(Acute myocardial infarction, unspecified). 
+
+In addition, we also find out `I25.0`(Atherosclerotic cardiovascular disease, so described) can be clusterd into 2 groups. For those states with higher death rate in `I25.0`, have positive correlation with `I25.1` and `I21.9`, but those with low rate do not show significant correlationship with other cause of death.
+
+
+## d
+
+```{r}
+vote_origin_data = read_csv('vote_data.csv')
+state_list = c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island","Vermont","New Jersey",'New York','Delaware', 'District of Columbia', "Maryland",'Pennsylvania', 'Virginia','West Virginia','Alabama', 'Florida', 'Georgia', 'Kentucky', 'Mississippi', 'North Carolina','South Carolina', 'Tennessee','Illinois','Indiana', 'Michigan', 'Minnesota', 'Ohio','Wisconsin','Arkansas', 'Louisiana', 'New Mexico', 'Oklahoma', 'Texas','Iowa', 'Kansas', 'Missouri', 'Nebraska','Colorado', 'Montana', 'North Dakota', 'South Dakota', 'Utah', 'Wyoming','Arizona', 'California', 'Hawaii', 'Nevada','Alaska', 'Idaho', 'Oregon', 'Washington')
+vote_data = vote_origin_data %>%
+  filter(state %in% state_list) %>% 
+  dplyr::select(state,called) 
+new_data_1 = dt_1_c %>%
+  left_join(vote_data,by = c('State'='state'))
+
+new_data_1 %>% GGally::ggparcoord(columns = 2:(ncol(new_data_1)-1),groupColumn = ncol(new_data_1),alphaLines = .5,splineFactor = 0,scale = 'uniminmax') +
+  scale_color_manual(values = c("D" = "blue","R" = "Red"))+
+  ggplot2::scale_size_identity()+
+  theme(legend.position = 'bottom') +
+  theme_bw() +
+  labs(title = 'Static Parallel Coordinates Plot of Cause of death Code',
+       subtitle = ' each line represents a state, colored by voting party',
+       x = 'Cause of death Code', y = 'uniminmax scale value',
+       color = 'Chosen Party')
+data_1 %>% dplyr::select(`Cause of death Code`, `Cause of death`) %>%
+  distinct(`Cause of death Code`, `Cause of death`) %>%
+  filter(`Cause of death Code` %in% top_eight_code) 
+```
+From this plot, we can see that states voting Republican Party have much higher death rate in `G30.9`, `J44.9` and `I21.9`.
+
+Additionally, we also find out that lines with same color are close to each other, meaning that the voting party is a factor that can be used to cluster.
+
+
+# 2. External causes of death 
+
+```{r input_2}
+dt_2_origin = read_tsv('q2_data.txt')
+dt_2 = dt_2_origin %>%
+  filter(is.na(Notes)) %>%
+  dplyr::select(-Notes) 
+```
+
+## a
+
+```{r 2a}
+dt_2 %>%
+  group_by(Gender) %>%
+  summarise('Total_Deaths' = sum(Deaths))
+```
+
+
+## b
+
+```{r}
+get_V_name = function(num){
+  case_when(
+    num <10 ~ 'Pedestrian injured in transport accident',
+    num >=10 & num <20 ~ 'Pedal cycle rider injured in transport accident',
+    num >=20 & num <30 ~ 'Motorcycle rider injured in transport accident',
+    num >=30 & num <40 ~ 'Occupant of three-wheeled motor vehicle injured in transport accident',
+    num >=40 & num <50 ~ 'Car occupant injured in transport accident',
+    num >=50 & num <60 ~ 'Occupant of pick-up truck or van injured in transport accident',
+    num >=60 & num <70 ~ 'Occupant of heavy transport vehicle injured in transport accident',
+    num >=70 & num <80 ~ 'Bus occupant injured in transport accident',
+    num >=80 & num <90 ~ 'Other land transport accidents',
+    num >=90 & num <95 ~ 'Water transport accidents',
+    num >=95 & num <98 ~'Air and space transport accidents',
+    num >=98  ~ 'Other and unspecified transport accidents'
+  )
+  }
+
+get_W_name = function(num){
+  case_when(
+    num <20 ~ 'Slipping, tripping, stumbling and falls',
+    num >=20 & num <50 ~ 'Exposure to inanimate mechanical forces',
+    num >=50 & num <65 ~ 'Exposure to animate mechanical forces',
+    num >=65 & num <75 ~ 'Accidental non-transport drowning and submersion',
+    num >=85 ~ 'Exposure to electric current, radiation and extreme ambient air temperature and pressure'
+  )
+  }
+
+get_X_name = function(num){
+  case_when(
+    num <9 ~ 'Exposure to smoke, fire and flames',
+    num >=10 & num <20 ~ 'Contact with heat and hot substances',
+    num >=30 & num <40 ~ 'Exposure to forces of nature',
+    num ==50 ~ 'Overexertion and strenuous or repetitive movements',
+    num >=52 & num <59 ~ 'Accidental exposure to other specified factors',
+    num >=71 & num <84 ~ 'Intentional self-harm',
+    num >=92 ~ 'Assault'
+  )
+}
+
+get_Y_name = function(num){
+  case_when(
+    num <10 ~ 'Assault',
+    num >=21 & num <34 ~ 'Event of undetermined intent',
+    num >=35 & num <39 ~ ' Legal intervention, operations of war, military operations, and terrorism',
+    num >=62 & num <70 ~ 'Misadventures to patients during surgical and medical care',
+    
+    num >=70 & num <83 ~ 'Surgical and other medical procedures as the cause of abnormal reaction of the patient, or of later complication, without mention of misadventure at the time of the procedure',
+    num >=83 & num <85 ~ 'Misadventures to patients during surgical and medical care',
+    num >=90 ~ 'Supplementary factors related to causes of morbidity classified elsewhere'
+  )
+  }
+
+get_shorter_name = function(code){
+  code_l = substr(code,1,1)
+  code_num = as.numeric(substr(code,2,3))
+  case_when(
+    code_l == 'V' ~ get_V_name(code_num),
+    code_l == 'W' ~ get_W_name(code_num),
+    code_l == 'X' ~ get_X_name(code_num),
+    code_l == 'Y' ~ get_Y_name(code_num)
+  )
+}
+
+
+```
+
+```{r}
+get_subchapter = function(code){
+    code_l = substr(code,1,1)
+    code_num = as.numeric(substr(code,2,3))
+    case_when(
+    code_l == 'V' ~ 'External Causes of Injury for Transport Accidents',
+    code_l == 'W' & (is.na(get_W_name(code))==F) ~ 'Injuries Due to Falls and Exposure',
+    code_l == 'X' & (is.na(get_X_name(code))==F)~ 'Injuries Due to Self-Harm, Assault, or Undetermined Intent',
+    code_l == 'Y' & code_num<=9 ~ 'Injuries Due to Self-Harm, Assault, or Undetermined Intent',
+    code_l == 'Y' & code_num>9 & (is.na(get_Y_name(code))==F) ~ 'Legal, Military, and Medical Causes and Supplementary Factors'
+  )
+}
+
+get_subchapter_code = function(subchapter){
+  case_when(
+    subchapter == 'External Causes of Injury for Transport Accidents' ~ 'TA',
+    subchapter == 'Injuries Due to Falls and Exposure' ~ 'FE',
+    subchapter == 'Injuries Due to Self-Harm, Assault, or Undetermined Intent'~ 'SAU',
+    subchapter == 'Legal, Military, and Medical Causes and Supplementary Factors' ~ 'LMMS'
+  )
+}
+
+get_new_racename = function(r){
+  if(r == 'Asian or Pacific Islander') 
+    {return('Asian')}
+    else {
+      if(r == 'Black or African American')
+        {return('Black')}
+      else {return('White')}}
+}
+
+dt_2_b = dt_2 %>%
+  mutate('first_letter_of_Code' = substr(`Cause of death Code`,1,1))%>%
+  filter(`first_letter_of_Code` %in% c('V','W','X','Y')) %>%
+  mutate(subchapters =  get_subchapter(`Cause of death Code`)) %>%
+  mutate(sub_subchapters = get_shorter_name(`Cause of death Code`)) %>%
+  mutate(subchapters_code = get_subchapter_code(subchapters)) %>%
+  filter(is.na(subchapters)==F) %>%
+  filter((`Ten-Year Age Groups` %in% c("< 1 year", "1-4 years", "5-14 years", "Not Stated"))==F) %>%
+  filter(Race != 'American Indian or Alaska Native') %>%
+  mutate(Race =ifelse(Race == 'Asian or Pacific Islander','Asian',
+                      ifelse(Race == 'Black or African American','Black','White'))) %>%
+  mutate(age = `Ten-Year Age Groups Code`)
+dt_2_b %>% group_by(subchapters) %>%
+  summarise(total_death = sum(Deaths))
+```
+
+## c
+
+```{r 2c}
+library(vcd)
+mosaic(subchapters_code ~ Race , direction = c("h", "v"),
+       xtabs( Deaths~ Race + subchapters_code,dt_2_b),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       main = 'Mosaic Plot of Subchapter v.s. Race',
+       rot_labels=c(0,90,0,0),
+       labeling_args=
+         list(gp_labels=gpar(fontsize=10),gp_varnames=gpar(fontsize=10)))
+mosaic(subchapters_code ~ Gender, direction = c("h", "v"),
+       xtabs( Deaths~ Gender + subchapters_code,dt_2_b),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       main = 'Mosaic Plot of Subchapter v.s. Gender',
+       rot_labels=c(0,90,0,0),
+       labeling_args=
+         list(gp_labels=gpar(fontsize=10),gp_varnames=gpar(fontsize=10)))
+mosaic(subchapters_code ~ age, direction = c("h", "v"), 
+       xtabs( Deaths~ age + subchapters_code,dt_2_b),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       main = 'Mosaic Plot of Subchapter v.s. age',
+       rot_labels=c(0,90,0,0),
+       labeling_args=
+         list(gp_labels=gpar(fontsize=10),gp_varnames=gpar(fontsize=10)))
+dt_2_b %>% group_by(subchapters_code, subchapters) %>%
+  distinct(subchapters_code, subchapters) 
+```
+
+The mosaic plots show that `age` variable appears to have the strongest association with subchapter.
+
+## d
+
+```{r}
+chisq.test(xtabs(Deaths~ Race + subchapters_code,dt_2_b))
+chisq.test(xtabs(Deaths~ Gender + subchapters_code,dt_2_b))
+chisq.test(xtabs(Deaths~ age + subchapters_code,dt_2_b))
+```
+
+The p-value of all three test are significantly small, but the chi-square test statistic `X-squared` has the exteremely high value in the age test. Though the freedom degree is different, it still indicates stronger association with subchapter.
+
+## e
+
+```{r}
+
+mosaic(subchapters_code ~ Gender + age, direction = c("h","h", "v"), xtabs(Deaths ~ Gender+ age+ subchapters_code,dt_2_b),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       rot_labels=c(0:1,90,0,0),main = 'All Races')
+mosaic(subchapters_code ~ Gender + age, direction = c("h","h", "v"), xtabs(Deaths ~ Gender + Race + age+ subchapters_code,dt_2_b %>% filter(Race=='Asian')),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       rot_labels=c(0:1,90,0,0),main = 'Asian Group')
+mosaic(subchapters_code ~ Gender + age, direction = c("h","h", "v"), xtabs(Deaths ~ Gender + Race + age+ subchapters_code,dt_2_b %>% filter(Race=='Black')),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       rot_labels=c(0:1,90,0,0),main = 'Black Group')
+mosaic(subchapters_code ~ Gender + age, direction = c("h","h", "v"), xtabs(Deaths ~ Gender + Race + age+ subchapters_code,dt_2_b %>% filter(Race=='White')),
+       highlighting_fill = c("yellow", "red","blue",'green'),
+       rot_labels=c(0:1,90,0,0),main = 'White Group')
+```
+
+From the previous plot we can conclude that Asian and white female groups have the death number sightly increase with the growth of age groups while the black group on the contrary shows sharply decline.
+
+# 3
+
+```{r 3}
+dt_3 = read_csv('ManhattanCDResults.csv') %>%
+  filter(Type =='Non-safety QoL') %>%
+  select(-Type)
+```
+
+As cd1 and cd2 are the same, we remove cd1 from the data set.
+
+## a 
+
+```{r 3a}
+# devtools::install_github("jtr13/redav")
+library(redav)
+dt_3_a = as_tibble(apply((map_dfr(dt_3[,2:ncol(dt_3)],function(x) sub("%","",x))),2,as.numeric)) %>%
+  mutate(Indicator = dt_3$Indicator) %>%
+  dplyr::select(Indicator,everything()) %>%
+  dplyr::select(-cd1) %>%
+  pivot_longer(cols = cd2:cd12, names_to = 'community_districts', values_to = 'Value')%>%
+  pivot_wider(names_from = Indicator, values_from = Value)
+  
+draw_biplot(dt_3_a,fix_sign = T)
+```
+
+## b
+
+### Which indicator is the most uncorrelated with Availability of health care services?
+
+`Air quality`, based on the bi-plot we can find out that the vector of `Air quality` is basically perpendicular to the vector of `Availability of health care services`
+
+### Which indicator is most positively correlated with Control of street noise?
+
+`Neighborhood playgrounds`, based on the bi-plot the vector of `Control of street noise` and the vector of `Neighborhood playgrounds` have the most similar directions.
+
+### Which indicator is most negatively correlated with Rat control?
+
+`Traffic`,the vector of `Rat control` and the vector of `Traffic` have basically have the opposite direction in the bi-plot.
+
+## c 
+
+### What clusters do you observe?
+
+Community districts can be divided into 5 different clusters, cd4 and cd7 will in the cluster contain only itself, cd8 and cd2 will be in the same cluster, cd5 and cd6 will in the same cluster, and the rest 5 districts will be in the same cluster. 
+
+### Are the districts in each cluster located near each other geographically?
+
+From the Manhattan districts maps we can find out that cd3(Chinatown, East Village, Lower East Side, NoHo, Two Bridges) are not located near the other districts(Inwood, Washington Heights, Harlem) in the same clusters.
+
+cd2(Greenwich Village, Hudson Square, Little Italy, NoHo, SoHo, South Village, West Village) and cd8(Carnegie Hill, Lenox Hill, Roosevelt Island, Upper East Side, Yorkville) are also not located near geographically.
+
+### Which district(s) if any are outliers?
+
+cd7(Lincoln Square, Manhattan Valley, Upper West Side) is exteremely different from other districts on bi-plot, as it's far from any other districts.
+
+### Which district would you choose to live in based on the biplot?
+
+Based on biplot, I would choose to live in cd7(Lincoln Square, Manhattan Valley, Upper West Side) as its basically perform better in any aspectes comparing to other districts.
+
+## d Traffic
+```{r}
+draw_biplot(dt_3_a,key_axis = "Traffic",fix_sign = T)
+```
+
+### What is the order of the projected points from lowest to highest along this dimension?
+
+It's cd6, cd5, cd8, cd2, cd12, cd3, cd4, cd11, cd9, cd10, cd7.
+
+### How does this order compare to the true order found in the original data?
+
+The original order is 
+```{r}
+as.list(dt_3_a %>% select(community_districts, Traffic) %>% arrange(Traffic) %>% select(community_districts))
+```
+
+There are some slightly difference in detail orders but the order is basically follow the order generated from the bi-plot.
+
+# 4 Alaska fire risk
+
+```{r}
+dt_4 = read_csv('akff_download.csv')
+library(vcdExtra)
+```
+
+## a 
+
+As there will be no data on BIG LAKE, we remove the observation on BIG LAKE and visualize the remaining data.
+
+```{r}
+get_firelevel = function(pars){
+  ATF=pars[1]
+  RHP=pars[2]
+  FFMC=pars[3]
+  DMC=pars[4]
+  DC=pars[5]
+  ISI=pars[6]
+  BUI=pars[7]
+  FWI=pars[8]
+  level1 = case_when(ATF<50 ~ 1, ATF<60 ~ 2, ATF<70 ~ 3 ,ATF<80 ~ 4, ATF>=80 ~ 5)
+  level2 = case_when(RHP<=20 ~ 5, RHP<=30 ~ 4, RHP<=40 ~ 3 ,RHP<=50 ~ 2, RHP>=51 ~ 1)
+  level3 = case_when(FFMC<80 ~ 1, FFMC<86 ~ 2, FFMC<89 ~ 3 ,FFMC<92 ~ 4, FFMC>=92 ~ 5)
+  level4 = case_when(DMC<40 ~ 1, DMC<60 ~ 2, DMC<80 ~ 3 ,DMC<100 ~ 4, DMC>=100 ~ 5)
+  level5 = case_when(DC<150 ~ 1, DC<350 ~ 2, DC<400 ~ 3 ,DC<450 ~ 4, DC>=450 ~ 5)
+  level6 = case_when(ISI<2 ~ 1, ISI<5 ~ 2, ISI<8 ~ 3 ,ISI<11 ~ 4, ISI>=11 ~ 5)
+  level7 = case_when(BUI<40 ~ 1, BUI<60 ~ 2, BUI<90 ~ 3 ,BUI<110 ~ 4, BUI>=110 ~ 5)
+  level8 = case_when(FWI<9 ~ 1, FWI<18 ~ 2, FWI<28 ~ 3 ,FWI<35 ~ 4, FWI>=35 ~ 5)
+  return(max(level1,level2,level3,level4,level5,level6,level7,level8))
+}
+re_name = function(level){
+  case_when(level== 1 ~ 'Low', 
+            level== 2 ~ 'Medium',
+            level== 3 ~ 'High',
+            level== 4 ~ 'Very-High',
+            level== 5 ~ 'Exteremly-High')
+}
+fire_level = fct_rev(factor(map_dfc(
+  apply(dt_4 %>%select(ATF,RHP,FFMC,DMC,DC,ISI,BUI,FWI),1,get_firelevel),re_name),
+  levels = c('Low','Medium','High','Very-High','Exteremly-High')))
+dt_4_a = dt_4 %>% cbind(fire_level = fire_level) %>% na.omit() %>%
+  select(NAME,DATE,fire_level) %>% 
+  mutate(DATE = paste0(substr(DATE,7,8),'d')) 
+library(ggalluvial)
+dt_4_a %>% ggplot(aes(alluvium  = NAME, x = DATE,stratum  = fire_level,
+                      fill = fire_level, label = NAME)) + 
+  geom_flow(stat = "alluvium", color = "darkgray") +
+  geom_stratum(aes(fill=fire_level, label = NAME)) +
+  scale_fill_manual(values=c("red","orange",'yellow',"blue",'green'),
+                    breaks=c("Exteremly-High","Very-High","High","Medium","Low"))+
+  geom_text(stat = "alluvium", size = 1.5) +
+  labs(title = 'Alluvial Diagram of the data', fill = 'Fire Level')
+
+```
+
+## b 
+
+```{r}
+dt_4_a %>%
+  ggplot(aes(DATE,NAME,fill = fire_level)) +
+  geom_tile(color = 'white') +
+  coord_equal() +
+  scale_fill_manual(values=c("red","orange",'yellow',"blue",'green'),
+                    breaks=c("Exteremly-High","Very-High","High","Medium","Low")) +
+  labs(title = 'Heatmap of the data', fill = 'Fire Level')
+```
+
+## c
+
+Alluvial Diagram shows the trend of all the places as well as the trend of a sigle place while the heat map not show the trend more clearly. So we think alluvial diagram is more effective.

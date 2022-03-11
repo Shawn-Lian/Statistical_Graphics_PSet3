@@ -1,0 +1,120 @@
+---
+title: "Problem Set 3 Spring 2022"
+author: 
+date: 
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# this prevents package loading message from appearing in the rendered version of your problem set 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+Notes:
+
+Grading is based both on your graphs and verbal explanations. Follow all best practices as discussed in class, including choosing appropriate parameters for all graphs. Do not expect the assignment questions to spell out precisely how the graphs should be drawn. Sometimes guidance will be provided, but the absense of guidance does not mean that all choices are ok.
+
+Read *Graphical Data Analysis with R*, Ch. 6, 7
+
+**NEW**: We are moving in the direction of reproducible workflows. Test that your code runs for both members of the group without making any changes. That means that you should not have `setwd()` in your code, but rather, use the same relative paths to the data.
+
+### 1. Mortality by state
+
+For this exercise, we will continue to explore CDC mortality data for 2020, this time considering cause of death by state. 
+
+a) Retrieve the appropriate data by reproducing the query shown in `PSet3Q1request_form.pdf`. Display the first five rows.
+
+b) Determine the eight `Cause of death Code` values with the highest number of deaths in 2020. Find the number of deaths for each of these eight codes by state, and then determine the *death rate* (deaths per 100000) for each. Display the death rates for these eight codes for New York State.
+
+c) Create a static parallel coordinates plot using `GGally::ggparcoord()` showing state death rate patterns for these eight codes for all fifty states. Your graph should have one line for each state and the codes should be the axes of the graph. Include a conversation chart below displaying the `Cause of death` for each of the eight `Cause of death Code` values since they're too long to fit in the plot. Apply alpha blending, splines, and rescaling to create the clearest version of the plot that you can. Discuss outliers, clusters, and correlations in detail.
+
+d) Classify the states into two categories by the party of the candidate who won the state in the 2020 presidential election: Democrat ("blue state") or Republican ("red state"). You can find the data online, for example on this web site: https://www.cookpolitical.com/2020-national-popular-vote-tracker
+
+Create an interactive parallel coordinates plot of the same data as in part c), coloring by state "color": red vs. blue. Discuss any new observations that weren't apparent in the previous plot.
+
+### 2. External causes of death
+
+For the following problems, we will study the underlying cause of death with regard to age, gender, and race.
+
+a) Modify your query to retrieve data that contains categories of age, gender, and race for each cause of death in 2020 by reproducing the query shown in `PSet3Q2request_form.pdf`. Remove the rows and columns associated with the metadata (`Notes` column and rows which contained notes.) Display total deaths by `Gender`.
+
+b) For this question, we will focus on **external causes of morbidity and mortality**, indicated by `Cause of death Code` starting with V, W, X, and Y. These are the subchapters of the larger category (or "chapter"). Transform your data as follows:
+
+* Create a new column containing the first letter of the `Cause of death Code`.
+
+* Filter for V, W, X and Y. 
+
+* Add a column with a more descriptive, yet short, name for these subchapters. See: https://www.outsourcestrategies.com/blog/why-how-use-icd10-external-causes-codes.html for help. 
+
+* Remove the following since the numbers are very small: age groups `< 1 year`, `1-4 years`, `5-14 years` and `Not Stated` and racial group `American Indian or Alaska Native`. 
+
+* Shorten the race labels to `Asian`, `Black`, `White`. 
+
+Display the breakdown of deaths by subchapter using the descriptive name.
+
+*For parts c) and e), treat subchapter as the dependent variable.*
+
+c) Create mosaic plots that show the association between race and subchapter, gender and subchapter, and age and subchapter. You can either create three separate graphs or one `pairs()` plot. Which variable appears to have the strongest association with subchapter?
+
+Coding tips:
+
+A warning that none of the common methods for combining multiple plots such as `par(mfrow = ...)`, `grid.arrange()` etc. work for `mosaic()` so don't head down that route.
+
+For `pairs()` to work with mosaic plots, `library(vcd)` needs to be loaded and the data must be in table form (use `xtabs()` to convert).
+
+d) Use chi-square tests to test the relationships from part c). Do the results support what you found in the mosaic plots?
+
+Coding tip: 
+
+The data must be in table, not counts, form. Use `xtabs()` to convert. 
+
+e) Create a mosaic plot that best shows the relationship between subchapter, race, age, and gender. What patterns do you observe that were not visible when you only consider two variables at a time? (Given that the racial groups are very different sizes, you may want to make a separate mosaic plot for each racial group.)
+
+### 3. Community districts
+
+For this question we'll use a subset of data from a survey on NYC attitudes toward various quality of life issues. The data is provided in a file called "CBDBManhattan.csv". The original source of the data is: https://cbcny.org/sites/default/files/media/files/Manhattan%20Community%20District%20Results.pdf
+
+We will work only with the `Non-safety QoL` indicators so remove data relating to other indicator types.
+
+a) Draw a biplot of the results of a PCA analysis. In the biplot, the vectors should be the indicators and the points the community districts. You will need to transform the data to get it in the right form for this plot. To do so, use `pivot_longer()` and `pivot_wider()`. 
+
+For parts b) and c), answer based on your biplot from part a).
+
+b) Indicators
+
+* Which indicator is the most uncorrelated with `Availability of health care services`?
+
+* Which indicator is most positively correlated with `Control of street noise`?
+
+* Which indicator is most negatively correlated with `Rat control`?
+
+c) Clusters
+
+* What clusters do you observe? 
+
+* Are the districts in each cluster located near each other geographically? 
+
+* Which district(s) if any are outliers? 
+
+* Which district would you choose to live in based on the biplot?
+
+d) `Traffic`
+
+Draw another biplot of the data in which the `Traffic` variable is calibrated. 
+
+* What is the order of the projected points from lowest to highest along this dimension? 
+
+* How does this order compare to the true order found in the original data?
+
+### 4. Alaska fire risk
+
+The file `akff_download.csv` contains information about fire and fuel related indices for regions in Alaska during the last 10 days of Sep. 2021. More information about this data can be found here: https://akff.mesowest.org/about/.
+
+[This chart](https://fire.ak.blm.gov/content/weather/images/Fuels%20Page/CFFDRS%20Index%20Thresholds.jpg) provides a fire risk level associated with different variables such as temperature, fine fuel moisture code, etc.
+
+a) Create an alluvial diagram that shows the CFFDRS fire level movement over time for all the regions in Alaska included in the data file. Assume that on any given day in any region, the risk level is the *highest* of associated risk levels for the different variables. Each alluvium should represent a single region and should be clearly labeled. 
+
+b) Create a heatmap of the same data.
+
+c) What are the advantages and disadvantages of each? Which do you think is more effective?
+
