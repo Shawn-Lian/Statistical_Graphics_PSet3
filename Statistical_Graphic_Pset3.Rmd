@@ -1,6 +1,6 @@
 ---
 title: "Statistical Graphic Pset3"
-author: 'Group21: Xuan Lian, Jiaxin Yu'
+author: 'Group21: Xuan Lian'
 date: "3/1/2022"
 output: html_document
 ---
